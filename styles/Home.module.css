@@ -286,3 +286,97 @@
   .hero { padding: 48px 20px 40px; }
   .steps { grid-template-columns: 1fr 1fr; }
 }
+
+.navRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.userAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+}
+
+.userName { font-size: 14px; color: var(--ink-light); }
+
+.signOutBtn {
+  background: transparent;
+  border: 0.5px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 13px;
+  color: var(--ink-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.signOutBtn:hover { background: var(--cream); color: var(--ink); }
+
+.sessionsSection {
+  width: 100%;
+  max-width: 480px;
+  margin-top: 32px;
+}
+
+.sessionsTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 12px;
+  text-align: left;
+}
+
+.sessionsList { display: flex; flex-direction: column; gap: 8px; }
+
+.sessionCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sessionCard:hover {
+  border-color: var(--accent-light);
+  background: var(--accent-pale);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow);
+}
+
+.sessionIcon { font-size: 20px; }
+.sessionInfo { flex: 1; min-width: 0; }
+
+.sessionBookTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessionMeta { font-size: 12px; color: var(--ink-muted); margin-top: 2px; }
+
+.deleteBtn {
+  background: transparent;
+  border: none;
+  color: var(--ink-muted);
+  font-size: 18px;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.deleteBtn:hover { background: #FDECEA; color: #C0392B; }
