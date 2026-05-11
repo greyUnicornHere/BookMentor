@@ -1,3 +1,50 @@
+import admin from '../../lib/firebase-admin';
+
+// ── Constants ──────────────────────────────────────────────────────────────
+const BOOK_TEXT_LIMIT = 45_000;   // chars sent to Gemini
+const MAX_MESSAGES = 100;
+const MAX_MESSAGE_LENGTH = 10_000;
+const MAX_BOOK_TEXT_LENGTH = 200_000;
+const VALID_ROLES = new Set(['user', 'assistant']);
+
+// ── Rate limiting (in-memory, per-IP) ─────────────────────────────────────
+const rateLimitStore = new Map();
+const RATE_LIMIT_WINDOW_MS = 60_000;  // 1 minute
+const RATE_LIMIT_MAX_REQUESTS = 20;
+
+function isRateLimited(ip) {
+  const now = Date.now();
+
+  // Periodic cleanup: purge expired entries when map grows large
+  if (rateLimitStore.size > 1000) {
+    for (const [key, entry] of rateLimitStore) {
+      if (now > entry.resetAt) rateLimitStore.delete(key);
+    }
+  }
+
+  const entry = rateLimitStore.get(ip) ?? { count: 0, resetAt: now + RATE_LIMIT_WINDOW_MS };
+  if (now > entry.resetAt) {
+    entry.count = 0;
+    entry.resetAt = now + RATE_LIMIT_WINDOW_MS;
+  }
+  entry.count += 1;
+  rateLimitStore.set(ip, entry);
+  return entry.count > RATE_LIMIT_MAX_REQUESTS;
+}
+
+// ── Auth verification ──────────────────────────────────────────────────────
+async function verifyAuth(req) {
+  const authHeader = req.headers.authorization ?? '';
+  if (!authHeader.startsWith('Bearer ')) return null;
+  const idToken = authHeader.slice(7);
+  try {
+    return await admin.auth().verifyIdToken(idToken);
+  } catch {
+    return null;
+  }
+}
+
+// ── System prompt ──────────────────────────────────────────────────────────
 const SYSTEM_PROMPT = `You are an elite personal coach. You have read and deeply internalized the following book, and it is the sole source of your coaching wisdom:
 
 ---BOOK CONTENT START---
@@ -47,18 +94,67 @@ Hard rules:
 - If the user is being vague or evasive, gently call it out
 - The goal is not for them to feel good — it is for them to grow`;
 
+// ── Handler ────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { messages, bookText, bookTitle } = req.body;
-
-  if (!messages || !bookText) {
-    return res.status(400).json({ error: 'Missing required fields' });
+  // Environment check
+  if (!process.env.GEMINI_API_KEY) {
+    console.error('GEMINI_API_KEY is not configured');
+    return res.status(500).json({ error: 'Server configuration error' });
   }
 
-  const truncatedBook = bookText.slice(0, 45000);
+  // Rate limiting
+  const ip = req.headers['x-forwarded-for']?.split(',')[0].trim() ?? req.socket.remoteAddress ?? 'unknown';
+  if (isRateLimited(ip)) {
+    return res.status(429).json({ error: 'Too many requests. Please wait a moment.' });
+  }
+
+  // Auth verification
+  const decodedToken = await verifyAuth(req);
+  if (!decodedToken) {
+    // FIREBASE_SERVICE_ACCOUNT not set → admin.auth() throws on verifyIdToken.
+    // In that case verifyAuth returns null, but we still want to block unauthenticated
+    // requests when credentials ARE configured. When they are NOT configured (dev),
+    // we log a warning and proceed so the dev environment still works.
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    console.warn('[coach] Auth not verified — FIREBASE_SERVICE_ACCOUNT not set');
+  }
+
+  // Input validation
+  const { messages, bookText, bookTitle } = req.body ?? {};
+
+  if (!Array.isArray(messages) || messages.length === 0 || messages.length > MAX_MESSAGES) {
+    return res.status(400).json({ error: 'messages must be a non-empty array of at most 100 items' });
+  }
+
+  for (const msg of messages) {
+    if (
+      !msg ||
+      typeof msg !== 'object' ||
+      !VALID_ROLES.has(msg.role) ||
+      typeof msg.content !== 'string' ||
+      msg.content.length === 0 ||
+      msg.content.length > MAX_MESSAGE_LENGTH
+    ) {
+      return res.status(400).json({ error: 'Each message must have a valid role and non-empty content under 10,000 characters' });
+    }
+  }
+
+  if (typeof bookText !== 'string' || bookText.length === 0 || bookText.length > MAX_BOOK_TEXT_LENGTH) {
+    return res.status(400).json({ error: 'bookText must be a non-empty string under 200,000 characters' });
+  }
+
+  if (bookTitle !== undefined && (typeof bookTitle !== 'string' || bookTitle.length > 500)) {
+    return res.status(400).json({ error: 'bookTitle must be a string under 500 characters' });
+  }
+
+  // Build prompt
+  const truncatedBook = bookText.slice(0, BOOK_TEXT_LIMIT);
   const systemPrompt = SYSTEM_PROMPT.replace('{BOOK_TEXT}', truncatedBook);
 
   const geminiMessages = messages.map(m => ({
@@ -73,9 +169,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: systemPrompt }],
-          },
+          system_instruction: { parts: [{ text: systemPrompt }] },
           contents: geminiMessages,
           generationConfig: {
             maxOutputTokens: 1024,
@@ -97,8 +191,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ content });
   } catch (error) {
     console.error('Gemini API error:', error);
-    return res.status(500).json({
-      error: error.message || 'Failed to get response from coach',
-    });
+    return res.status(500).json({ error: 'Failed to get a response from the coach. Please try again.' });
   }
 }

@@ -78,9 +78,15 @@ export default function Home() {
     }
   }, []);
 
+  const MAX_FILE_SIZE_MB = 50;
+
   const handleFile = useCallback((file) => {
     if (!file) return;
     if (file.type !== 'application/pdf') { setError('Please upload a PDF file.'); return; }
+    if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      setError(`File is too large. Please upload a PDF under ${MAX_FILE_SIZE_MB} MB.`);
+      return;
+    }
     extractPDF(file);
   }, [extractPDF]);
 
@@ -175,7 +181,7 @@ export default function Home() {
             <div
               className={`${styles.uploadZone} ${isDragging ? styles.dragging : ''}`}
               onClick={() => fileInputRef.current?.click()}
-              onDrop={handleFile.bind(null, null)}
+              onDrop={(e) => { e.preventDefault(); setIsDragging(false); handleFile(e.dataTransfer.files[0]); }}
               onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
               onDragLeave={() => setIsDragging(false)}
             >
