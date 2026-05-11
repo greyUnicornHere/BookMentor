@@ -4,6 +4,10 @@ import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import styles from '../styles/CoachChat.module.css';
 
+// Chars saved to Firestore — matches what the API sends to Gemini so resumed
+// sessions see the same book context as the original session.
+const BOOK_TEXT_STORAGE_LIMIT = 45_000;
+
 function GapCard({ data }) {
   return (
     <div className={styles.gapCard}>
@@ -80,17 +84,18 @@ export default function CoachChat({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [sendError, setSendError] = useState('');
+  const [pendingRetry, setPendingRetry] = useState(null); // { userContent, history, sid }
   const messagesEndRef = useRef(null);
   const isInitialized = useRef(false);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // Save session to Firestore
   const saveSession = useCallback(async (msgs, sid) => {
     if (!user) return sid;
     const sessionData = {
       bookTitle,
-      bookText: bookText.slice(0, 10000),
+      bookText: bookText.slice(0, BOOK_TEXT_STORAGE_LIMIT),
       pageCount,
       messages: msgs,
       messageCount: msgs.filter(m => !m.content.startsWith('I just uploaded')).length,
@@ -119,27 +124,52 @@ export default function CoachChat({
       : history;
     if (userContent) setMessages(newMessages);
     setIsLoading(true);
+    setSendError('');
+    setPendingRetry(null);
+
     try {
+      const idToken = await user.getIdToken();
       const apiMessages = newMessages
         .filter(m => !m.content.startsWith('GAP_ASSESSMENT:'))
         .map(m => ({ role: m.role, content: m.content }));
+
       const res = await fetch('/api/coach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({ messages: apiMessages, bookText, bookTitle }),
       });
+
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) throw new Error(data.error || 'Something went wrong');
+
       const reply = { role: 'assistant', content: data.content };
       const updatedMessages = [...newMessages, reply];
       setMessages(updatedMessages);
       const newSid = await saveSession(updatedMessages, currentSessionId);
       if (!currentSessionId) setSessionId(newSid);
     } catch (err) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${err.message}` }]);
+      setSendError(err.message || 'Failed to reach the coach. Please try again.');
+      // Store context so the user can retry without losing their message
+      setPendingRetry({ userContent, history, sid: currentSessionId });
+      // If we added the user message optimistically, keep it visible but remove
+      // it from the stored list so retry doesn't double-send
+      if (userContent) {
+        setMessages(newMessages);
+      }
     }
     setIsLoading(false);
-  }, [bookText, bookTitle, saveSession]);
+  }, [user, bookText, bookTitle, saveSession]);
+
+  const handleRetry = useCallback(() => {
+    if (!pendingRetry) return;
+    const { userContent, history, sid } = pendingRetry;
+    // Remove the optimistically-added user message from display before re-sending
+    setMessages(history);
+    sendMessage(userContent, history, sid);
+  }, [pendingRetry, sendMessage]);
 
   useEffect(() => {
     if (isInitialized.current) return;
@@ -235,6 +265,16 @@ export default function CoachChat({
                 </div>
               ))}
             {isLoading && <TypingIndicator />}
+            {sendError && (
+              <div className={styles.errorBanner}>
+                <span className={styles.errorBannerText}>{sendError}</span>
+                {pendingRetry && (
+                  <button className={styles.retryBtn} onClick={handleRetry}>
+                    Try again
+                  </button>
+                )}
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
