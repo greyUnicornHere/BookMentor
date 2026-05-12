@@ -517,3 +517,268 @@
 }
 
 .signOutSmall:hover { color: var(--ink); }
+
+/* Assessment Progress Bar */
+.assessmentBar {
+  padding: 10px 24px;
+  background: var(--accent-pale);
+  border-bottom: 1px solid var(--accent-light);
+  flex-shrink: 0;
+}
+
+.assessmentBarTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.assessmentBarLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--accent);
+}
+
+.assessmentPulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+  animation: pulse 1.5s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.assessmentBarPercent {
+  font-size: 11px;
+  color: var(--accent);
+  opacity: 0.7;
+}
+
+.assessmentBarTrack {
+  height: 3px;
+  background: var(--accent-light);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.assessmentBarFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+  transition: width 0.8s ease;
+}
+
+/* Gap Card Full Report */
+.gapCardWrapper {
+  width: 100%;
+  padding: 8px 0;
+}
+
+.gapCardFull {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+  width: 100%;
+}
+
+.gapCardRevealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.gapCardFullHeader {
+  background: var(--ink);
+  color: white;
+  padding: 28px 28px 24px;
+  text-align: center;
+}
+
+.gapCardFullBadge {
+  display: inline-block;
+  background: rgba(255,255,255,0.15);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 100px;
+  padding: 4px 14px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.gapCardFullTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -0.01em;
+}
+
+.gapCardFullSub {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.gapLevelSection {
+  padding: 24px 28px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.gapLevelLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink-muted);
+  margin-bottom: 10px;
+}
+
+.gapLevelRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.levelBadgeLg {
+  padding: 6px 18px;
+  border-radius: 100px;
+  font-size: 14px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.levelSummaryLg {
+  font-size: 14px;
+  color: var(--ink-light);
+  line-height: 1.5;
+}
+
+.levelBar {
+  position: relative;
+}
+
+.levelBarFill {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  margin-bottom: 6px;
+  transition: width 1s ease 0.3s;
+}
+
+.levelFillBeginner { width: 20%; background: #E65100; }
+.levelFillDeveloping { width: 55%; background: #0D47A1; }
+.levelFillAdvanced { width: 90%; background: #1B5E20; }
+
+.levelBarLabels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+.gapReportSection {
+  padding: 20px 28px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.gapReportSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.gapReportIcon { font-size: 16px; }
+
+.gapReportSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.gapReportContent {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink-light);
+}
+
+.roadmapFull {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.roadmapItemFull {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.roadmapNumFull {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--accent-pale);
+  color: var(--accent);
+  border: 1px solid var(--accent-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.roadmapTextFull {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink-light);
+  padding-top: 3px;
+}
+
+.gapCardCTA {
+  padding: 24px 28px;
+  background: var(--accent-pale);
+  text-align: center;
+}
+
+.gapCardCTAText {
+  font-size: 14px;
+  color: var(--ink-light);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+.gapCardCTABtn {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 12px 28px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.gapCardCTABtn:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}

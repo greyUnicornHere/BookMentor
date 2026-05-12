@@ -4,45 +4,113 @@ import { doc, setDoc, collection, addDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import styles from '../styles/CoachChat.module.css';
 
-function GapCard({ data }) {
+const ASSESSMENT_PHASES = [
+  { min: 0, max: 1, label: 'Getting to know you...' },
+  { min: 2, max: 3, label: 'Understanding your situation...' },
+  { min: 4, max: 5, label: 'Identifying your patterns...' },
+  { min: 6, max: 7, label: 'Almost ready to assess...' },
+  { min: 8, max: 99, label: 'Finalizing your assessment...' },
+];
+
+function AssessmentBar({ exchangeCount, assessmentDone }) {
+  if (assessmentDone) return null;
+  const progress = Math.min((exchangeCount / 8) * 100, 95);
+  const phase = ASSESSMENT_PHASES.find(p => exchangeCount >= p.min && exchangeCount <= p.max);
+
   return (
-    <div className={styles.gapCard}>
-      <div className={styles.gapHeader}>
-        <span className={styles.gapIcon}>📊</span>
-        <span className={styles.gapTitle}>Gap Assessment</span>
-      </div>
-      <div className={styles.levelRow}>
-        <span className={`${styles.levelBadge} ${styles[`level${data.level}`]}`}>{data.level}</span>
-        <span className={styles.levelSummary}>{data.level_summary}</span>
-      </div>
-      <div className={styles.gapSection}>
-        <div className={styles.gapSectionLabel}>🔍 Blind Spots</div>
-        <p className={styles.gapSectionContent}>{data.blind_spots}</p>
-      </div>
-      <div className={styles.gapSection}>
-        <div className={styles.gapSectionLabel}>🗺️ Your Roadmap</div>
-        <div className={styles.roadmap}>
-          {(data.roadmap || []).map((item, i) => (
-            <div key={i} className={styles.roadmapItem}>
-              <div className={styles.roadmapNum}>{i + 1}</div>
-              <div className={styles.roadmapText}>{item}</div>
-            </div>
-          ))}
+    <div className={styles.assessmentBar}>
+      <div className={styles.assessmentBarTop}>
+        <div className={styles.assessmentBarLabel}>
+          <span className={styles.assessmentPulse} />
+          {phase?.label || 'Analyzing...'}
         </div>
+        <span className={styles.assessmentBarPercent}>Gap Assessment in progress</span>
+      </div>
+      <div className={styles.assessmentBarTrack}>
+        <div className={styles.assessmentBarFill} style={{ width: `${progress}%` }} />
       </div>
     </div>
   );
 }
 
-function Message({ msg }) {
+function GapCard({ data, onContinue }) {
+  const [revealed, setRevealed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setRevealed(true), 300);
+    return () => clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className={`${styles.gapCardFull} ${revealed ? styles.gapCardRevealed : ''}`}>
+      {/* Header */}
+      <div className={styles.gapCardFullHeader}>
+        <div className={styles.gapCardFullBadge}>Assessment Complete</div>
+        <h2 className={styles.gapCardFullTitle}>Your Gap Assessment Report</h2>
+        <p className={styles.gapCardFullSub}>Based on our conversation and the book's principles</p>
+      </div>
+
+      {/* Level */}
+      <div className={styles.gapLevelSection}>
+        <div className={styles.gapLevelLabel}>Current Level</div>
+        <div className={styles.gapLevelRow}>
+          <span className={`${styles.levelBadgeLg} ${styles[`level${data.level}`]}`}>{data.level}</span>
+          <span className={styles.levelSummaryLg}>{data.level_summary}</span>
+        </div>
+        <div className={styles.levelBar}>
+          <div className={`${styles.levelBarFill} ${styles[`levelFill${data.level}`]}`} />
+          <div className={styles.levelBarLabels}>
+            <span>Beginner</span><span>Developing</span><span>Advanced</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Blind Spots */}
+      <div className={styles.gapReportSection}>
+        <div className={styles.gapReportSectionHeader}>
+          <span className={styles.gapReportIcon}>🔍</span>
+          <span className={styles.gapReportSectionTitle}>Your Blind Spots</span>
+        </div>
+        <p className={styles.gapReportContent}>{data.blind_spots}</p>
+      </div>
+
+      {/* Roadmap */}
+      <div className={styles.gapReportSection}>
+        <div className={styles.gapReportSectionHeader}>
+          <span className={styles.gapReportIcon}>🗺️</span>
+          <span className={styles.gapReportSectionTitle}>Your Action Roadmap</span>
+        </div>
+        <div className={styles.roadmapFull}>
+          {(data.roadmap || []).map((item, i) => (
+            <div key={i} className={styles.roadmapItemFull}>
+              <div className={styles.roadmapNumFull}>{i + 1}</div>
+              <div className={styles.roadmapTextFull}>{item}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div className={styles.gapCardCTA}>
+        <p className={styles.gapCardCTAText}>
+          Now that we know where you stand — let's start closing that gap. I'll guide you through each step.
+        </p>
+        <button className={styles.gapCardCTABtn} onClick={onContinue}>
+          Let's bridge the gap →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Message({ msg, onGapContinue }) {
   const isUser = msg.role === 'user';
   if (!isUser && msg.content.startsWith('GAP_ASSESSMENT:')) {
     try {
       const data = JSON.parse(msg.content.replace('GAP_ASSESSMENT:', '').trim());
       return (
-        <div className={`${styles.msgRow} ${styles.coach}`}>
-          <div className={styles.avatar}>🎓</div>
-          <div style={{ flex: 1 }}><GapCard data={data} /></div>
+        <div className={styles.gapCardWrapper}>
+          <GapCard data={data} onContinue={onGapContinue} />
         </div>
       );
     } catch (e) {}
@@ -80,12 +148,24 @@ export default function CoachChat({
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState(null);
+  const [exchangeCount, setExchangeCount] = useState(0);
+  const [assessmentDone, setAssessmentDone] = useState(false);
+  const [showInput, setShowInput] = useState(true);
   const messagesEndRef = useRef(null);
   const isInitialized = useRef(false);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  // Save session to Firestore
+  // Check if assessment already done in existing session
+  useEffect(() => {
+    if (existingSession?.messages) {
+      const hasAssessment = existingSession.messages.some(m => m.content.startsWith('GAP_ASSESSMENT:'));
+      if (hasAssessment) setAssessmentDone(true);
+      const userMsgs = existingSession.messages.filter(m => m.role === 'user' && !m.content.startsWith('I just uploaded'));
+      setExchangeCount(userMsgs.length);
+    }
+  }, [existingSession]);
+
   const saveSession = useCallback(async (msgs, sid) => {
     if (!user) return sid;
     const sessionData = {
@@ -113,11 +193,14 @@ export default function CoachChat({
     }
   }, [user, bookTitle, bookText, pageCount, onSessionSaved]);
 
-  const sendMessage = useCallback(async (userContent, history, currentSessionId) => {
+  const sendMessage = useCallback(async (userContent, history, currentSessionId, currentExchangeCount) => {
     const newMessages = userContent
       ? [...history, { role: 'user', content: userContent }]
       : history;
-    if (userContent) setMessages(newMessages);
+    if (userContent) {
+      setMessages(newMessages);
+      setExchangeCount(prev => prev + 1);
+    }
     setIsLoading(true);
     try {
       const apiMessages = newMessages
@@ -133,6 +216,13 @@ export default function CoachChat({
       const reply = { role: 'assistant', content: data.content };
       const updatedMessages = [...newMessages, reply];
       setMessages(updatedMessages);
+
+      // Check if assessment was issued
+      if (data.content.startsWith('GAP_ASSESSMENT:')) {
+        setAssessmentDone(true);
+        setShowInput(false); // Hide input until user clicks CTA
+      }
+
       const newSid = await saveSession(updatedMessages, currentSessionId);
       if (!currentSessionId) setSessionId(newSid);
     } catch (err) {
@@ -147,18 +237,24 @@ export default function CoachChat({
     if (existingSession?.messages?.length > 0) {
       setMessages(existingSession.messages);
       setSessionId(existingSession.id);
+      setShowInput(true);
       return;
     }
     const opener = `I just uploaded "${bookTitle}". Please introduce yourself as my coach for this book and ask your first diagnostic question.`;
-    sendMessage(null, [{ role: 'user', content: opener }], null);
+    sendMessage(null, [{ role: 'user', content: opener }], null, 0);
   }, [bookTitle, existingSession, sendMessage]);
 
   const handleSend = useCallback(() => {
     const text = input.trim();
     if (!text || isLoading) return;
     setInput('');
-    sendMessage(text, messages, sessionId);
-  }, [input, isLoading, messages, sessionId, sendMessage]);
+    sendMessage(text, messages, sessionId, exchangeCount);
+  }, [input, isLoading, messages, sessionId, exchangeCount, sendMessage]);
+
+  const handleGapContinue = useCallback(() => {
+    setShowInput(true);
+    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+  }, []);
 
   const wordCount = Math.round(bookText.split(' ').length / 100) * 100;
 
@@ -166,23 +262,17 @@ export default function CoachChat({
     <>
       <Head><title>{bookTitle} · BookMentor</title></Head>
       <div className={styles.layout}>
-
-        {/* Sidebar */}
         <aside className={styles.sidebar}>
           <div className={styles.sidebarLogo}>
             <span>📖</span>
             <span className={styles.sidebarLogoText}>BookMentor</span>
           </div>
-
-          {/* Active book */}
           <div className={styles.bookCard}>
             <div className={styles.bookCardIcon}>📗</div>
             <div className={styles.bookCardTitle}>{bookTitle}</div>
             <div className={styles.bookCardMeta}>{pageCount} pages · ~{wordCount.toLocaleString()} words</div>
             <div className={styles.activeTag}>Active session</div>
           </div>
-
-          {/* Other sessions tabs */}
           {sessions.filter(s => s.id !== sessionId).length > 0 && (
             <div className={styles.otherSessions}>
               <div className={styles.otherSessionsLabel}>Other sessions</div>
@@ -198,7 +288,6 @@ export default function CoachChat({
               ))}
             </div>
           )}
-
           <div className={styles.sidebarFooter}>
             <button className={styles.newSessionBtn} onClick={onReset}>↩ Upload new book</button>
             {user && (
@@ -211,7 +300,6 @@ export default function CoachChat({
           </div>
         </aside>
 
-        {/* Chat */}
         <main className={styles.chatMain}>
           <div className={styles.chatHeader}>
             <div className={styles.chatHeaderLeft}>
@@ -226,34 +314,39 @@ export default function CoachChat({
             </div>
           </div>
 
+          {/* Assessment progress bar */}
+          <AssessmentBar exchangeCount={exchangeCount} assessmentDone={assessmentDone} />
+
           <div className={styles.messages}>
             {messages
               .filter(m => !m.content.startsWith('I just uploaded'))
               .map((msg, i) => (
                 <div key={i} className={styles.msgWrapper}>
-                  <Message msg={msg} />
+                  <Message msg={msg} onGapContinue={handleGapContinue} />
                 </div>
               ))}
             {isLoading && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
 
-          <div className={styles.inputArea}>
-            <textarea
-              className={styles.input}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
-              }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-              placeholder="Reply to your coach..."
-              rows={1}
-              disabled={isLoading}
-            />
-            <button className={styles.sendBtn} onClick={handleSend} disabled={isLoading || !input.trim()}>↑</button>
-          </div>
+          {showInput && (
+            <div className={styles.inputArea}>
+              <textarea
+                className={styles.input}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 140) + 'px';
+                }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                placeholder="Reply to your coach..."
+                rows={1}
+                disabled={isLoading}
+              />
+              <button className={styles.sendBtn} onClick={handleSend} disabled={isLoading || !input.trim()}>↑</button>
+            </div>
+          )}
         </main>
       </div>
     </>
