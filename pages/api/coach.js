@@ -96,7 +96,8 @@ export default async function handler(req, res) {
       throw new Error(data.error?.message || `Gemini API error ${response.status}`);
     }
 
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const parts = data.candidates?.[0]?.content?.parts || [];
+    const content = parts.filter(p => p.text && !p.thought).map(p => p.text).join("") || parts.filter(p => p.text).map(p => p.text).join("");
     if (!content) throw new Error('No response from Gemini');
 
     return res.status(200).json({ content });
