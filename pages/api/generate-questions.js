@@ -6,6 +6,10 @@ const QUESTIONS_PROMPT = `You are a master educator and assessment designer who 
 
 Your task: design a Duolingo-style diagnostic assessment that reveals where a reader truly stands with this book's core ideas.
 
+STEP 0 — IDENTIFY THE BOOK'S INTENT AND CONTEXT (do this silently before writing anything).
+Before generating questions, identify the book's primary intent and audience. If the book's principles apply universally across life contexts (negotiation, habits, mindset, communication, productivity, decision-making, persuasion), generate questions from varied settings — workplace, home, romantic and friend relationships, family, and broader social life. If the book is written for a specific domain (parenting, fitness, business strategy, finance, cooking, sales, leadership of a specific kind), generate questions WITHIN that domain but vary the specific situations and stakeholders inside it (e.g., a parenting book: toddler bedtime, teen with phone, sibling fight, in-law conflict — not all toddler bedtime).
+Never generate all questions from the same narrow context. No assessment should be all office meetings or all toddler tantrums. Variety inside the right domain is the rule.
+
 Step 1 — Extract the distinct CORE ACTIONABLE IDEAS from this book.
 - Find the principles that actually change behavior, not surface concepts.
 - A core idea is something the author would say is non-negotiable to "getting" the book.
@@ -20,12 +24,10 @@ Step 2 — For each core idea, write ONE scenario-based question (Type B).
 - Keep each question to 2-4 sentences. Keep each option to one short sentence.
 - Do not name the principle in the question. The user should not be able to game it.
 
-CRITICAL — MIX THE LIFE CONTEXTS:
-- Use a deliberate mix of scenarios across these contexts: workplace, personal relationships (romantic, friendships), family (parents, siblings, kids), and social situations (strangers, community, public life).
-- NEVER use only work scenarios. If you only have work scenarios, you have failed.
-- Each question, where possible, must come from a DIFFERENT life context than the others. Spread them.
-- Scenarios should feel real and relatable — your friend texting you, a parent at dinner, a stranger on the subway — not corporate ("the quarterly review," "the stakeholder meeting").
-- A good test: would someone who has never worked in an office still recognize this situation? Aim for that.
+CRITICAL — APPLY YOUR STEP 0 DECISION:
+- If you decided the book is UNIVERSAL: spread scenarios deliberately across workplace, personal relationships (romantic, friendships), family (parents, siblings, kids), and social life (strangers, community, public). Each question, where possible, from a different context. No corporate-only language. A good test: would someone who has never worked in an office still recognize this scenario?
+- If you decided the book is DOMAIN-SPECIFIC: stay inside the domain, but vary the specific situations and people inside it. Different stakeholders, settings, ages, stakes. Same domain, different angles. Never repeat the same micro-situation.
+- Either way: NEVER generate all questions from the same narrow context.
 
 Step 3 — Return ONLY valid JSON in this exact shape, with no markdown, no commentary, no code fences:
 {

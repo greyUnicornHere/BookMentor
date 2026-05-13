@@ -1,8 +1,8 @@
-const ASSESSMENT_PROMPT = `You are the coach from Good Will Hunting — warm, perceptive, honest. You designed the diagnostic the reader just took, and now you must tell them the truth about how they think about this book's core ideas.
+const ASSESSMENT_PROMPT = `You are the coach from Good Will Hunting — warm, perceptive, honest. You designed the diagnostic the reader just took, and now you must tell them the truth about how they think about this book's core ideas, AND give them a complete map of what this book contains.
 
 Book title: {BOOK_TITLE}
 
-Core ideas of the book:
+Core ideas of the book (each tested by one question):
 {CORE_IDEAS}
 
 The reader answered the following questions:
@@ -13,13 +13,37 @@ Scorecard:
 - Principles they got: {STRENGTH_PRINCIPLES}
 - Principles they missed: {MISSED_PRINCIPLES}
 
-Your task:
-1. Write a "how_you_think" narrative — one short paragraph (3-5 sentences) that names the pattern beneath their answers. What does their selection across these scenarios reveal about how they reason, what they reach for, what they overlook? Be specific to what they actually picked. No platitudes. No generic coach-speak.
-2. Identify 2-3 blind_spots. Each one is a sharp, named observation in the form:
-   - name: a bold, vivid phrase that crystallizes the pattern (e.g., "You reason when you should empathize", "You optimize before you understand")
-   - description: one honest sentence anchored in the book's logic — what they default to vs. what the book says
-   Each blind spot must trace back to specific principles they missed. No vague "you sometimes struggle with X" — be sharp.
-3. For each core idea in the list, classify it as "gap" (they missed the question testing it) or "strength" (they got it). For each, write a one-sentence description in plain language of what that principle means. The description must be useful even to someone who never read the book.
+Your task has THREE parts.
+
+PART 1 — "how_you_think"
+One short paragraph (3-5 sentences) that names the pattern beneath their answers. What does their selection across these scenarios reveal about how they reason, what they reach for, what they overlook? Be specific to what they actually picked. No platitudes. No generic coach-speak.
+
+PART 2 — "blind_spots" (2 or 3 items)
+Each one is a sharp, named observation:
+  - name: a bold, vivid phrase that crystallizes the pattern (e.g., "You reason when you should empathize", "You optimize before you understand")
+  - description: one honest sentence anchored in the book's logic — what they default to vs. what the book says
+Each blind spot must trace back to specific principles they missed. No vague "you sometimes struggle with X" — be sharp.
+
+PART 3 — "learning_map" (the full curriculum from this book)
+Extract and categorize the book's actual content into FIVE TYPES. For each, use the exact type string shown:
+  - "Framework": models, systems, step-by-step processes the book teaches (e.g., a 4-step method, a 2x2 matrix)
+  - "Key Insight": surprising findings, data points, counterintuitive ideas the book is built on
+  - "Mindset Shift": how the book wants you to think differently about something
+  - "Practical Tool": specific techniques, scripts, drills, or methods you can apply
+  - "Common Mistake": what the book warns against — the failure mode it tries to fix
+
+For each item, return:
+  - type: one of the five strings above, exactly
+  - title: short name (2-6 words)
+  - description: ONE sentence explaining what it means in plain language a stranger could understand
+  - status: "recommended" | "strength" | "neutral"
+
+How to set status:
+  - "recommended": the user demonstrated they need this — it maps closely to a principle they MISSED, or it is a tool/framework that directly addresses their blind spots. These should glow yellow for the reader.
+  - "strength": the user demonstrated mastery of this — it maps to a principle they got CORRECT.
+  - "neutral": this is core book content but not directly tested by their answers — they neither demonstrated it nor failed it.
+
+Aim for roughly 12-20 total items across the five types, with at least 1 item per type when the book supports it. Do not invent content not in the book. Do not collapse distinct ideas into one to fit a quota.
 
 Return ONLY valid JSON in this exact shape, no markdown, no code fences:
 {
@@ -28,16 +52,18 @@ Return ONLY valid JSON in this exact shape, no markdown, no code fences:
     {"name": "Bold vivid name", "description": "One sharp honest sentence."},
     {"name": "Bold vivid name", "description": "One sharp honest sentence."}
   ],
-  "book_map": [
-    {"idea": "Plain-language name of the principle", "description": "One sentence on what this principle means.", "status": "gap"}
+  "learning_map": [
+    {"type": "Framework", "title": "Short name", "description": "One sentence.", "status": "recommended"}
   ]
 }
 
 Rules:
-- blind_spots array must have 2 or 3 items.
-- book_map must include EVERY core idea from the list above, in the same order, with the correct status from the scorecard.
-- status must be exactly "gap" or "strength".
+- type must be one of: "Framework", "Key Insight", "Mindset Shift", "Practical Tool", "Common Mistake".
+- status must be one of: "recommended", "strength", "neutral".
 - Output must be valid JSON parseable by JSON.parse — no trailing commas, no comments.`;
+
+const VALID_TYPES = new Set(['Framework', 'Key Insight', 'Mindset Shift', 'Practical Tool', 'Common Mistake']);
+const VALID_STATUSES = new Set(['recommended', 'strength', 'neutral']);
 
 function extractJSON(text) {
   if (!text) return null;
@@ -68,20 +94,15 @@ export default async function handler(req, res) {
   let correctCount = 0;
   const missedPrinciples = [];
   const strengthPrinciples = [];
-  const ideaStatusMap = {};
 
   const qaLines = questions.map((q, i) => {
     const userAnswer = answers[q.id] || '';
     const correct = q.correctAnswer && userAnswer === q.correctAnswer;
     if (correct) {
       correctCount++;
-      if (q.coreIdea) {
-        strengthPrinciples.push(q.coreIdea);
-        ideaStatusMap[q.coreIdea] = 'strength';
-      }
+      if (q.coreIdea) strengthPrinciples.push(q.coreIdea);
     } else if (q.coreIdea) {
       missedPrinciples.push(q.coreIdea);
-      ideaStatusMap[q.coreIdea] = 'gap';
     }
 
     const userOption = q.options?.find(o => o.startsWith(`${userAnswer})`)) || '(no answer)';
@@ -114,7 +135,7 @@ Result: ${correct ? 'CORRECT' : 'MISSED'}`;
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: 5000,
+            maxOutputTokens: 8000,
             temperature: 0.7,
             responseMimeType: 'application/json',
           },
@@ -140,17 +161,16 @@ Result: ${correct ? 'CORRECT' : 'MISSED'}`;
       throw new Error('Gemini returned an invalid assessment.');
     }
 
-    const bookMap = Array.isArray(parsed.book_map) && parsed.book_map.length
-      ? parsed.book_map.map(item => ({
-          idea: item.idea || '',
-          description: item.description || '',
-          status: item.status === 'strength' ? 'strength' : 'gap',
-        }))
-      : (coreIdeas || []).map(idea => ({
-          idea,
-          description: '',
-          status: ideaStatusMap[idea] === 'strength' ? 'strength' : 'gap',
-        }));
+    const learningMap = Array.isArray(parsed.learning_map)
+      ? parsed.learning_map
+          .filter(item => item && item.title)
+          .map(item => ({
+            type: VALID_TYPES.has(item.type) ? item.type : 'Key Insight',
+            title: String(item.title).trim(),
+            description: String(item.description || '').trim(),
+            status: VALID_STATUSES.has(item.status) ? item.status : 'neutral',
+          }))
+      : [];
 
     const blindSpots = Array.isArray(parsed.blind_spots)
       ? parsed.blind_spots
@@ -163,7 +183,7 @@ Result: ${correct ? 'CORRECT' : 'MISSED'}`;
       score,
       how_you_think: parsed.how_you_think || '',
       blind_spots: blindSpots,
-      book_map: bookMap,
+      learning_map: learningMap,
       correct: correctCount,
       total,
     });
