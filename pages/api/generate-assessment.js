@@ -1,4 +1,4 @@
-const ASSESSMENT_PROMPT = `You are the coach from Good Will Hunting — warm, perceptive, honest. You designed the diagnostic the reader just took, and now you must tell them the truth about where they stand with this book's core ideas.
+const ASSESSMENT_PROMPT = `You are the coach from Good Will Hunting — warm, perceptive, honest. You designed the diagnostic the reader just took, and now you must tell them the truth about how they think about this book's core ideas.
 
 Book title: {BOOK_TITLE}
 
@@ -8,28 +8,36 @@ Core ideas of the book:
 The reader answered the following questions:
 {QA_BLOCK}
 
-Their scorecard:
+Scorecard:
 - Correct: {CORRECT_COUNT} of {TOTAL_COUNT}
-- Missed principles: {MISSED_PRINCIPLES}
+- Principles they got: {STRENGTH_PRINCIPLES}
+- Principles they missed: {MISSED_PRINCIPLES}
 
 Your task:
-1. Choose a level from exactly one of: "Beginner", "Developing", "Advanced".
-   - Beginner: missed half or more — they are reading the words but not absorbing the framework.
-   - Developing: getting some core ideas but with clear, specific blind spots.
-   - Advanced: nearly all correct — they have internalized the book's logic.
-2. Write a one-sentence level_summary that is honest and specific to what their answers revealed.
-3. Write 2-3 sentences of blind_spots — name the specific principles they missed and what that pattern reveals about how they currently think. Reference the book's language. No generic platitudes.
-4. Write a 3-4 step roadmap drawn directly from this book's tools, drills, or practices. Each step must be concrete enough to do this week. No fluff.
+1. Write a "how_you_think" narrative — one short paragraph (3-5 sentences) that names the pattern beneath their answers. What does their selection across these scenarios reveal about how they reason, what they reach for, what they overlook? Be specific to what they actually picked. No platitudes. No generic coach-speak.
+2. Identify 2-3 blind_spots. Each one is a sharp, named observation in the form:
+   - name: a bold, vivid phrase that crystallizes the pattern (e.g., "You reason when you should empathize", "You optimize before you understand")
+   - description: one honest sentence anchored in the book's logic — what they default to vs. what the book says
+   Each blind spot must trace back to specific principles they missed. No vague "you sometimes struggle with X" — be sharp.
+3. For each core idea in the list, classify it as "gap" (they missed the question testing it) or "strength" (they got it). For each, write a one-sentence description in plain language of what that principle means. The description must be useful even to someone who never read the book.
 
 Return ONLY valid JSON in this exact shape, no markdown, no code fences:
 {
-  "level": "Beginner|Developing|Advanced",
-  "level_summary": "one honest sentence",
-  "blind_spots": "2-3 sentences on the specific principles missed and the pattern beneath them",
-  "roadmap": ["concrete action 1", "concrete action 2", "concrete action 3", "concrete action 4"]
+  "how_you_think": "3-5 sentence narrative on their pattern of thought",
+  "blind_spots": [
+    {"name": "Bold vivid name", "description": "One sharp honest sentence."},
+    {"name": "Bold vivid name", "description": "One sharp honest sentence."}
+  ],
+  "book_map": [
+    {"idea": "Plain-language name of the principle", "description": "One sentence on what this principle means.", "status": "gap"}
+  ]
 }
 
-The roadmap array must have 3 or 4 items. Output must be valid JSON — no trailing commas, no comments.`;
+Rules:
+- blind_spots array must have 2 or 3 items.
+- book_map must include EVERY core idea from the list above, in the same order, with the correct status from the scorecard.
+- status must be exactly "gap" or "strength".
+- Output must be valid JSON parseable by JSON.parse — no trailing commas, no comments.`;
 
 function extractJSON(text) {
   if (!text) return null;
@@ -59,13 +67,24 @@ export default async function handler(req, res) {
 
   let correctCount = 0;
   const missedPrinciples = [];
+  const strengthPrinciples = [];
+  const ideaStatusMap = {};
+
   const qaLines = questions.map((q, i) => {
     const userAnswer = answers[q.id] || '';
     const correct = q.correctAnswer && userAnswer === q.correctAnswer;
-    if (correct) correctCount++;
-    else if (q.coreIdea) missedPrinciples.push(q.coreIdea);
+    if (correct) {
+      correctCount++;
+      if (q.coreIdea) {
+        strengthPrinciples.push(q.coreIdea);
+        ideaStatusMap[q.coreIdea] = 'strength';
+      }
+    } else if (q.coreIdea) {
+      missedPrinciples.push(q.coreIdea);
+      ideaStatusMap[q.coreIdea] = 'gap';
+    }
 
-    const userOption = q.options?.find(o => o.startsWith(`${userAnswer})`)) || `(no answer)`;
+    const userOption = q.options?.find(o => o.startsWith(`${userAnswer})`)) || '(no answer)';
     const correctOption = q.options?.find(o => o.startsWith(`${q.correctAnswer})`)) || '';
     return `Q${i + 1} [tests: ${q.coreIdea}]
 Scenario: ${q.question}
@@ -74,12 +93,16 @@ Book's answer: ${correctOption}
 Result: ${correct ? 'CORRECT' : 'MISSED'}`;
   }).join('\n\n');
 
+  const total = questions.length;
+  const score = total > 0 ? Math.round((correctCount / total) * 100) : 0;
+
   const prompt = ASSESSMENT_PROMPT
     .replace('{BOOK_TITLE}', bookTitle || 'this book')
     .replace('{CORE_IDEAS}', (coreIdeas || []).map((c, i) => `${i + 1}. ${c}`).join('\n'))
     .replace('{QA_BLOCK}', qaLines)
     .replace('{CORRECT_COUNT}', String(correctCount))
-    .replace('{TOTAL_COUNT}', String(questions.length))
+    .replace('{TOTAL_COUNT}', String(total))
+    .replace('{STRENGTH_PRINCIPLES}', strengthPrinciples.length ? strengthPrinciples.join('; ') : 'none')
     .replace('{MISSED_PRINCIPLES}', missedPrinciples.length ? missedPrinciples.join('; ') : 'none');
 
   try {
@@ -91,7 +114,7 @@ Result: ${correct ? 'CORRECT' : 'MISSED'}`;
         body: JSON.stringify({
           contents: [{ role: 'user', parts: [{ text: prompt }] }],
           generationConfig: {
-            maxOutputTokens: 4000,
+            maxOutputTokens: 5000,
             temperature: 0.7,
             responseMimeType: 'application/json',
           },
@@ -112,17 +135,37 @@ Result: ${correct ? 'CORRECT' : 'MISSED'}`;
     if (!raw) throw new Error('No response from Gemini');
 
     const parsed = extractJSON(raw);
-    if (!parsed || !parsed.level) {
+    if (!parsed || !parsed.how_you_think) {
       console.error('Invalid assessment response:', raw.slice(0, 500));
       throw new Error('Gemini returned an invalid assessment.');
     }
 
+    const bookMap = Array.isArray(parsed.book_map) && parsed.book_map.length
+      ? parsed.book_map.map(item => ({
+          idea: item.idea || '',
+          description: item.description || '',
+          status: item.status === 'strength' ? 'strength' : 'gap',
+        }))
+      : (coreIdeas || []).map(idea => ({
+          idea,
+          description: '',
+          status: ideaStatusMap[idea] === 'strength' ? 'strength' : 'gap',
+        }));
+
+    const blindSpots = Array.isArray(parsed.blind_spots)
+      ? parsed.blind_spots
+          .filter(b => b && (b.name || b.description))
+          .slice(0, 3)
+          .map(b => ({ name: b.name || '', description: b.description || '' }))
+      : [];
+
     return res.status(200).json({
-      level: parsed.level,
-      level_summary: parsed.level_summary || '',
-      blind_spots: parsed.blind_spots || '',
-      roadmap: Array.isArray(parsed.roadmap) ? parsed.roadmap.slice(0, 4) : [],
-      score: { correct: correctCount, total: questions.length },
+      score,
+      how_you_think: parsed.how_you_think || '',
+      blind_spots: blindSpots,
+      book_map: bookMap,
+      correct: correctCount,
+      total,
     });
   } catch (error) {
     console.error('generate-assessment error:', error);

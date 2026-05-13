@@ -20,6 +20,13 @@ Step 2 — For each core idea, write ONE scenario-based question (Type B).
 - Keep each question to 2-4 sentences. Keep each option to one short sentence.
 - Do not name the principle in the question. The user should not be able to game it.
 
+CRITICAL — MIX THE LIFE CONTEXTS:
+- Use a deliberate mix of scenarios across these contexts: workplace, personal relationships (romantic, friendships), family (parents, siblings, kids), and social situations (strangers, community, public life).
+- NEVER use only work scenarios. If you only have work scenarios, you have failed.
+- Each question, where possible, must come from a DIFFERENT life context than the others. Spread them.
+- Scenarios should feel real and relatable — your friend texting you, a parent at dinner, a stranger on the subway — not corporate ("the quarterly review," "the stakeholder meeting").
+- A good test: would someone who has never worked in an office still recognize this situation? Aim for that.
+
 Step 3 — Return ONLY valid JSON in this exact shape, with no markdown, no commentary, no code fences:
 {
   "bookTitle": "the actual title of the book",
