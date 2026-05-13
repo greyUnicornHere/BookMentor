@@ -380,3 +380,146 @@
 }
 
 .deleteBtn:hover { background: #FDECEA; color: #C0392B; }
+
+/* Full-screen centered layout for intro + loading states */
+.fullCenter {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 80px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+}
+
+.bootScreen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--cream);
+}
+
+.bootInner { text-align: center; }
+.bootIcon { font-size: 32px; margin-bottom: 12px; }
+.bootName {
+  font-family: 'Playfair Display', serif;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+/* Loading card */
+.loadingCard {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 48px 40px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow);
+  animation: fadeUp 0.4s ease forwards;
+}
+
+.loadingText {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+  margin: 20px 0 8px;
+}
+
+.loadingHint {
+  font-size: 14px;
+  color: var(--ink-muted);
+  line-height: 1.6;
+}
+
+.loadingCard .spinner {
+  margin: 0 auto;
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+/* Intro card */
+.introCard {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 56px 48px;
+  max-width: 620px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  animation: fadeUp 0.5s ease forwards;
+}
+
+.introBadge {
+  display: inline-block;
+  background: var(--accent-pale);
+  color: var(--accent);
+  border: 1px solid var(--accent-light);
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 24px;
+}
+
+.introTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(28px, 4vw, 38px);
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+  margin-bottom: 32px;
+  letter-spacing: -0.01em;
+}
+
+.coachIntro {
+  text-align: left;
+  margin: 0 auto 36px;
+  max-width: 520px;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--ink-light);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.coachIntro em {
+  font-style: italic;
+  color: var(--accent);
+}
+
+.primaryCta {
+  display: inline-block;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 16px 36px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+  box-shadow: 0 4px 16px rgba(196,98,45,0.3);
+}
+
+.primaryCta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(196,98,45,0.4);
+}
+
+@media (max-width: 640px) {
+  .introCard { padding: 40px 24px; }
+  .loadingCard { padding: 36px 24px; }
+}

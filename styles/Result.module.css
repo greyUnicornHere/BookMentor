@@ -1,0 +1,208 @@
+.main {
+  min-height: 100vh;
+  background: var(--cream);
+  position: relative;
+  overflow-x: hidden;
+  padding: 56px 24px 80px;
+}
+
+.bgTexture {
+  position: fixed;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 10%, rgba(196,98,45,0.08) 0%, transparent 50%),
+    radial-gradient(circle at 80% 90%, rgba(196,98,45,0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.boot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: var(--cream);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.reveal {
+  position: relative;
+  z-index: 1;
+  max-width: 720px;
+  margin: 0 auto;
+  animation: fadeUp 0.6s ease forwards;
+}
+
+.bookLine {
+  text-align: center;
+  font-size: 14px;
+  color: var(--ink-muted);
+  margin-bottom: 16px;
+  letter-spacing: 0.04em;
+}
+
+.bookLine em {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  color: var(--ink);
+  font-size: 16px;
+}
+
+/* Level card */
+.levelCard {
+  background: linear-gradient(180deg, var(--warm-white) 0%, var(--accent-pale) 100%);
+  border: 1px solid var(--accent-light);
+  border-radius: var(--radius);
+  padding: 48px 32px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 40px;
+  animation: fadeUp 0.6s 0.1s ease both;
+}
+
+.levelEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 16px;
+}
+
+.levelName {
+  font-family: 'Playfair Display', serif;
+  font-size: clamp(56px, 9vw, 84px);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+  margin-bottom: 16px;
+}
+
+.levelTag {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: 18px;
+  color: var(--ink-light);
+  margin-bottom: 16px;
+}
+
+.score {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--ink-muted);
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Sections */
+.section {
+  background: var(--warm-white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 32px;
+  margin-bottom: 20px;
+  animation: fadeUp 0.6s 0.2s ease both;
+}
+
+.sectionTitle {
+  font-family: 'Playfair Display', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 12px;
+  letter-spacing: -0.01em;
+}
+
+.sectionBody {
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--ink-light);
+}
+
+/* Roadmap list */
+.roadmap {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.roadmapItem {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  background: var(--cream);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+}
+
+.stepNum {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.stepText {
+  flex: 1;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+  padding-top: 3px;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+  animation: fadeUp 0.6s 0.3s ease both;
+}
+
+.primaryBtn {
+  background: var(--ink);
+  color: var(--warm-white);
+  border: none;
+  border-radius: 999px;
+  padding: 14px 32px;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+}
+
+.primaryBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(26,22,20,0.18);
+  opacity: 0.95;
+}
+
+@media (max-width: 640px) {
+  .main { padding: 32px 16px 60px; }
+  .levelCard { padding: 36px 20px; }
+  .section { padding: 24px 20px; }
+}
