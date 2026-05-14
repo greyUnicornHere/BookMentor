@@ -1,18 +1,27 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../lib/firebase';
 import Login from './login';
 import styles from '../styles/Home.module.css';
+
+function slugify(s) {
+  return (
+    String(s || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 60) || 'book'
+  );
+}
 
 export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [stage, setStage] = useState('upload');
-  const [bookText, setBookText] = useState('');
-  const [bookTitle, setBookTitle] = useState('');
+  const [stage, setStage] = useState('upload'); // upload | extracting | analyzing
   const [processingStatus, setProcessingStatus] = useState('');
   const [error, setError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
@@ -32,14 +41,58 @@ export default function Home() {
     setStage('upload');
   };
 
-  const extractPDF = useCallback(async (file) => {
+  const analyzeBook = async (text, fallbackTitle) => {
+    setStage('analyzing');
+    try {
+      const res = await fetch('/api/generate-learning-map', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookText: text }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to analyze book');
+
+      const bookTitle = data.bookTitle || fallbackTitle;
+      const bookId = slugify(bookTitle);
+
+      sessionStorage.setItem('bm_book', JSON.stringify({
+        bookId,
+        bookTitle,
+        bookContext: data.bookContext || 'universal',
+        bookDomain: data.bookDomain || 'other',
+        bookText: text.slice(0, 50000),
+      }));
+      sessionStorage.setItem('bm_learning_map', JSON.stringify(data.cards || []));
+      sessionStorage.removeItem('bm_selected_card');
+      sessionStorage.removeItem('bm_completed');
+
+      let hasProfile = false;
+      try {
+        const snap = await getDoc(doc(db, 'users', user.uid, 'profile', 'main'));
+        if (snap.exists()) {
+          hasProfile = true;
+          sessionStorage.setItem('bm_profile', JSON.stringify(snap.data()));
+        }
+      } catch (e) {
+        console.error('Profile check failed:', e);
+      }
+
+      router.push(hasProfile ? '/map' : '/onboarding');
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Something went wrong analyzing your book.');
+      setStage('upload');
+    }
+  };
+
+  const extractPDF = async (file) => {
     setError('');
     setStage('extracting');
     const fallbackTitle = file.name.replace(/\.pdf$/i, '').replace(/[_-]/g, ' ');
-    setBookTitle(fallbackTitle);
     try {
       const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
       const totalPages = pdf.numPages;
@@ -51,55 +104,27 @@ export default function Home() {
         const content = await page.getTextContent();
         text += content.items.map(s => s.str).join(' ') + '\n';
       }
-      setBookText(text);
-      setStage('intro');
+      await analyzeBook(text, fallbackTitle);
     } catch (err) {
       console.error(err);
       setError('Could not read this PDF. Please try another file.');
       setStage('upload');
     }
-  }, []);
+  };
 
-  const handleFile = useCallback((file) => {
+  const handleFile = (file) => {
     if (!file) return;
     if (file.type !== 'application/pdf') {
       setError('Please upload a PDF file.');
       return;
     }
     extractPDF(file);
-  }, [extractPDF]);
+  };
 
   const onDrop = (e) => {
     e.preventDefault();
     setIsDragging(false);
-    const file = e.dataTransfer.files?.[0];
-    handleFile(file);
-  };
-
-  const startAssessment = async () => {
-    setStage('analyzing');
-    setError('');
-    try {
-      const res = await fetch('/api/generate-questions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookText }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to generate questions');
-
-      const finalTitle = data.bookTitle || bookTitle;
-      sessionStorage.setItem('bm_assessment', JSON.stringify({
-        bookTitle: finalTitle,
-        bookText,
-        coreIdeas: data.coreIdeas,
-        questions: data.questions,
-      }));
-      router.push('/assessment');
-    } catch (err) {
-      setError(err.message || 'Something went wrong analyzing your book.');
-      setStage('intro');
-    }
+    handleFile(e.dataTransfer.files?.[0]);
   };
 
   if (authLoading) {
@@ -131,7 +156,9 @@ export default function Home() {
             <span className={styles.logoText}>BookMentor</span>
           </div>
           <div className={styles.navRight}>
-            {user.photoURL && <img src={user.photoURL} alt={user.displayName} className={styles.userAvatar} />}
+            {user.photoURL && (
+              <img src={user.photoURL} alt={user.displayName} className={styles.userAvatar} />
+            )}
             <span className={styles.userName}>{user.displayName?.split(' ')[0]}</span>
             <button className={styles.signOutBtn} onClick={handleSignOut}>Sign out</button>
           </div>
@@ -140,12 +167,13 @@ export default function Home() {
         {stage === 'upload' && (
           <section className={styles.hero}>
             <div className={styles.heroContent}>
-              <div className={styles.badge}>AI-Powered Diagnostic</div>
+              <div className={styles.badge}>AI-Powered Learning Map</div>
               <h1 className={styles.heroTitle}>
-                Your book.<br /><em>Your blind spots.</em><br />A real assessment.
+                Your book.<br /><em>Mapped.</em><br />Made yours.
               </h1>
               <p className={styles.heroSub}>
-                Upload any non-fiction book. We extract its core principles and put you through a short diagnostic to reveal where you actually stand.
+                Upload any non-fiction book. We turn it into a personalized learning map —
+                every concept as a card you can explore and test yourself on, at your own pace.
               </p>
 
               <div
@@ -177,34 +205,8 @@ export default function Home() {
           <section className={styles.fullCenter}>
             <div className={styles.loadingCard}>
               <div className={styles.spinner} />
-              <p className={styles.loadingText}>{processingStatus}</p>
-              <p className={styles.loadingHint}>Reading every page so your coach knows the book inside out.</p>
-            </div>
-          </section>
-        )}
-
-        {stage === 'intro' && (
-          <section className={styles.fullCenter}>
-            <div className={styles.introCard}>
-              <div className={styles.introBadge}>Your Book</div>
-              <h2 className={styles.introTitle}>{bookTitle}</h2>
-
-              <div className={styles.coachIntro}>
-                <p>
-                  Hey. I&apos;ve just read this one. <em>Cover to cover.</em>
-                </p>
-                <p>
-                  Before I coach you on it, I need to see how you actually <em>think</em> about its ideas — not how well you can recite them. So I&apos;ve built you a short diagnostic. A few real-life scenarios. No right-sounding answers, just the one the book would actually endorse.
-                </p>
-                <p>
-                  At the end, I&apos;ll tell you the truth about where you stand, where your blind spots are, and exactly what to work on next. Ready?
-                </p>
-              </div>
-
-              <button className={styles.primaryCta} onClick={startAssessment}>
-                Start Assessment →
-              </button>
-              {error && <p className={styles.error}>{error}</p>}
+              <p className={styles.loadingText}>{processingStatus || 'Reading your book...'}</p>
+              <p className={styles.loadingHint}>Reading every page so we can map it properly.</p>
             </div>
           </section>
         )}
@@ -213,8 +215,10 @@ export default function Home() {
           <section className={styles.fullCenter}>
             <div className={styles.loadingCard}>
               <div className={styles.spinner} />
-              <p className={styles.loadingText}>Analyzing your book...</p>
-              <p className={styles.loadingHint}>Identifying the core principles and crafting your diagnostic.</p>
+              <p className={styles.loadingText}>Building your learning map...</p>
+              <p className={styles.loadingHint}>
+                Extracting every concept worth learning and organizing it into cards.
+              </p>
             </div>
           </section>
         )}
